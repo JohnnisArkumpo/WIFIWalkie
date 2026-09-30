@@ -3,7 +3,9 @@ CSE 310 Team 6
 
 ## Team Members
 Travis Newbry
+
 Christopher Rubio
+
 John Arthur
 
 ## Software Description
