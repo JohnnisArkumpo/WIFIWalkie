@@ -1,6 +1,6 @@
 # Task A: Networking and Protocol
 
-**Assigned to:** ______________
+**Assigned to:** Travis
 **Branch:** `a-networking`
 **Read first:** [00-overview.md](00-overview.md) (shared contracts), [DESIGN.md](../../DESIGN.md)
 

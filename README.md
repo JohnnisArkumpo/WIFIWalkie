@@ -10,7 +10,6 @@ John Arthur
 
 ## Software Description
 An Android app that transmits audio over WAN.
-
 ## Architecture
 App will be programmed in Kotlin.
 
@@ -60,11 +59,14 @@ Discord server
 
 |Responsibility                      |Team Member(s)              |
 |------------------------------------|----------------------------|
-|Conducting Meetings                 |                            |
-|Maintaining Team Assignment List    |                            |
-|Ensuring GitHub is Working          | John |
-|Maintaining Documentation           |                            |
-|Create & Display Presentations      | Travis |
-|Submit Team Assignments             | John |
+|Conducting Meetings                 | Travis                     |
+|Maintaining Team Assignment List    | Travis                     |
+|Ensuring GitHub is Working          | John                       |
+|Maintaining README and Documentation| Travis                     |
+|Create & Display Presentations      | Travis                     |
+|Submit Team Assignments             | John                       |
+|Task A: Networking                  | Travis                     |
+|Task B: Desktop Audio               | John                       |
+|iOS port                            | Christopher                |
 
 ## Reflections
