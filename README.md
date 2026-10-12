@@ -52,6 +52,18 @@ To run the tests: `./gradlew test`
 * [ ] Audio transmission
 * [ ] Screen-off mode
 
+## Stretch Goals
+
+* [ ] iOS port
+* [ ] Half-duplex mode
+* [ ] Screen-off mode, where transmission is driven by the volume keys
+* [ ] Peer-2-peer
+* [ ] Vibration transmission for morse code
+* [ ] Encode communications for security
+* [ ] "Repeat that" feature
+* [ ] Morse signal decoder
+* [ ] Desktop app and UI
+
 ## Team Communication
 Discord server
 
