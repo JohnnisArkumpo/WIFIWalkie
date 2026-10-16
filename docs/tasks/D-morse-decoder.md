@@ -1,6 +1,6 @@
 # Task D: Morse Decoder
 
-**Assigned to:** ______________
+**Assigned to:** Christopher
 **Branch:** `d-morse-decoder`
 **Read first:** [00-overview.md](00-overview.md), [DESIGN.md](../../DESIGN.md)
 
