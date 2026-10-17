@@ -26,7 +26,7 @@ You only need Java 17 or newer installed. The first run downloads JDK 25 and Kot
 
 ```
 ./gradlew -q --console=plain :desktop:run        (Linux / macOS)
-gradlew.bat -q --console=plain :desktop:run      (Windows)
+./gradlew.bat -q --console=plain :desktop:run      (Windows)
 ```
 
 1. The program prints this computer's network name and IP.
@@ -79,6 +79,7 @@ Discord server
 |Submit Team Assignments             | John                       |
 |Task A: Networking                  | Travis                     |
 |Task B: Desktop Audio               | John                       |
+|Task D: Morse Decoder               | Christopher                |
 |iOS port                            | Christopher                |
 
 ## Reflections

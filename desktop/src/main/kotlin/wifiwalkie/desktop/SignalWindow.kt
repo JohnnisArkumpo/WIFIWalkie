@@ -1,19 +1,26 @@
 package wifiwalkie.desktop
 
 import java.awt.BorderLayout
-import java.awt.Color
 import java.awt.Dimension
+import java.awt.GridLayout
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
 import javax.swing.BorderFactory
 import javax.swing.JFrame
 import javax.swing.JLabel
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
+import javax.swing.Timer
 import javax.swing.WindowConstants
 import wifiwalkie.core.Session
+import wifiwalkie.core.morse.MorseDecoder
+import wifiwalkie.desktop.ui.MorseGuide
+import wifiwalkie.desktop.ui.MorseSignalButton
+import wifiwalkie.desktop.ui.PressDurationGauge
+import wifiwalkie.desktop.ui.TranscriptPanel
 
 /**
- * The window: white while the peer holds space, black otherwise, with a
- * status line underneath. Create it on the Swing thread.
+ * Morse dashboard with a local press control, peer signal indicator and timing gauge.
  */
 class SignalWindow(title: String) : Session.Listener {
 
@@ -21,28 +28,80 @@ class SignalWindow(title: String) : Session.Listener {
     var onLocalSignal: (Boolean) -> Unit = {}
 
     private val frame = JFrame(title)
-    private val light = JPanel()
     private val status = JLabel()
+    private val localButton = MorseSignalButton("HOLD TO SEND", "SENDING…")
+    private val peerButton = MorseSignalButton("WAITING FOR PEER", "PEER SENDING…")
+    private val pressGauge = PressDurationGauge()
+    private val sentTranscript = TranscriptPanel("You sent")
+    private val receivedTranscript = TranscriptPanel("They sent")
+    private val sentDecoder = MorseDecoder()
+    private val receivedDecoder = MorseDecoder()
 
     private var peerConnected = false
     private var sending = false
+    private var peerSending = false
+    private var pressedAtNanos: Long? = null
+    private var lastPressDurationMs = 0L
 
     init {
-        light.background = Color.BLACK
-        light.preferredSize = Dimension(480, 320)
         status.border = BorderFactory.createEmptyBorder(6, 10, 6, 10)
 
+        val transcripts = JPanel(GridLayout(1, 2, 8, 0)).apply {
+            add(sentTranscript)
+            add(receivedTranscript)
+        }
+        val lower = JPanel(BorderLayout(8, 0)).apply {
+            add(MorseGuide(), BorderLayout.WEST)
+            add(transcripts, BorderLayout.CENTER)
+        }
+        lower.preferredSize = Dimension(760, 205)
+
+        val localControls = JPanel(BorderLayout(12, 0)).apply {
+            border = BorderFactory.createTitledBorder("Your signal")
+            add(localButton, BorderLayout.CENTER)
+            add(pressGauge, BorderLayout.EAST)
+        }
+        val peerControls = JPanel(BorderLayout()).apply {
+            border = BorderFactory.createTitledBorder("Incoming signal")
+            add(peerButton, BorderLayout.CENTER)
+        }
+        val signalControls = JPanel(GridLayout(1, 2, 10, 0)).apply {
+            add(localControls)
+            add(peerControls)
+            preferredSize = Dimension(760, 235)
+        }
+
         frame.defaultCloseOperation = WindowConstants.EXIT_ON_CLOSE
-        frame.add(light, BorderLayout.CENTER)
-        frame.add(status, BorderLayout.SOUTH)
+        val bottom = JPanel(BorderLayout()).apply {
+            add(lower, BorderLayout.CENTER)
+            add(status, BorderLayout.SOUTH)
+        }
+        frame.add(signalControls, BorderLayout.CENTER)
+        frame.add(bottom, BorderLayout.SOUTH)
         frame.pack()
         frame.setLocationRelativeTo(null)
 
         SpaceBarInput(frame) { down ->
-            sending = down
-            updateStatus()
-            onLocalSignal(down)
+            setLocalSignal(down)
         }
+        localButton.addMouseListener(object : MouseAdapter() {
+            override fun mousePressed(event: MouseEvent) {
+                if (event.button == MouseEvent.BUTTON1) setLocalSignal(true)
+            }
+
+            override fun mouseReleased(event: MouseEvent) {
+                if (event.button == MouseEvent.BUTTON1) setLocalSignal(false)
+            }
+        })
+        Timer(30) {
+            val pressStart = pressedAtNanos
+            val elapsed = if (sending && pressStart != null) {
+                (System.nanoTime() - pressStart) / 1_000_000
+            } else lastPressDurationMs
+            pressGauge.setElapsed(elapsed)
+            sentTranscript.append(sentDecoder.update(sending))
+            receivedTranscript.append(receivedDecoder.update(peerSending))
+        }.start()
         updateStatus()
     }
 
@@ -60,13 +119,32 @@ class SignalWindow(title: String) : Session.Listener {
 
     override fun onPeerSignalChanged(on: Boolean) {
         SwingUtilities.invokeLater {
-            light.background = if (on) Color.WHITE else Color.BLACK
+            peerSending = on
+            peerButton.setSignalActive(on)
+            receivedTranscript.append(receivedDecoder.update(on))
         }
+    }
+
+    private fun setLocalSignal(down: Boolean) {
+        if (sending == down) return
+        sending = down
+        if (down) {
+            pressedAtNanos = System.nanoTime()
+            lastPressDurationMs = 0
+        } else {
+            val startedAt = pressedAtNanos
+            if (startedAt != null) lastPressDurationMs = (System.nanoTime() - startedAt) / 1_000_000
+            pressedAtNanos = null
+        }
+        localButton.setSignalActive(down)
+        sentTranscript.append(sentDecoder.update(down))
+        updateStatus()
+        onLocalSignal(down)
     }
 
     private fun updateStatus() {
         val peer = if (peerConnected) "connected" else "waiting for the other computer…"
-        val you = if (sending) "SENDING" else "hold SPACE to send"
+        val you = if (sending) "SENDING · hold for a dot or dash" else "hold the button or SPACE to send"
         status.text = "Peer: $peer    |    You: $you"
     }
 }
