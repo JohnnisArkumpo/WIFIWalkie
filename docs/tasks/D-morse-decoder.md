@@ -6,7 +6,7 @@
 
 ## Goal
 
-Turn the on/off signal into letters. When the other person taps out `.... ..` with the space bar, the window shows **HI**.
+Turn the on/off signal into letters. When the other person taps out `.... ..` with the Morse key, the window shows **HI**. (The Morse key is space today; Task B moves it to `M` so space can be push-to-talk.)
 
 This task has **no dependencies**: you can start immediately, and almost all of it is pure logic you can unit test without a network.
 
@@ -99,7 +99,7 @@ In `desktop/.../SignalWindow.kt`:
 - **Feed the decoder** from `onPeerSignalChanged`, using `System.nanoTime() / 1_000_000` as the time. Use that rather than `currentTimeMillis`, which can jump when the clock is adjusted.
 - **Call `poll` regularly** with a `javax.swing.Timer` firing every 50 ms.
 - **Clear the text** when the peer disconnects.
-- **Optional:** also decode your own space-bar presses on a second line, so you can see what you're sending.
+- **Optional:** also decode your own Morse key presses on a second line, so you can see what you're sending.
 
 Task B also edits `SignalWindow.kt`. Keep your changes together, and pull `main` before opening your PR.
 

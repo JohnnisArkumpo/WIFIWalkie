@@ -100,7 +100,7 @@ Implement task B's interfaces for Android:
   - Read 640-byte frames on a background thread.
   - Android only *guarantees* 44.1 kHz, though 16 kHz works on nearly all phones. If the `AudioRecord` fails to initialize, record at 48000 Hz and keep every third sample.
 - **`AndroidAudioOutput : AudioOutput`:** use `AudioTrack` with `USAGE_VOICE_COMMUNICATION`, 16000 Hz mono 16-bit, in streaming mode.
-- **Connecting it:** reuse task B's `JitterBuffer` and `AudioPlayback` from `core`, connected the same way B does on desktop: hold to talk sends audio, `onPeerAudio` pushes into the buffer, and a connection change resets it.
+- **Connecting it:** reuse Task F's `PlayoutBuffer` and `AudioPlayback` from `core`, connected the same way B does on desktop: hold to talk sends audio (first frame flagged `startOfTransmission`), `onPeerAudio` pushes into the buffer, a connection change resets it, and the buffer's `onTalkingChanged` drives a "they're talking" indicator.
 - **Permission:** request `RECORD_AUDIO` at runtime the first time the user holds the button. If they refuse, keep working with the signal only.
 
 ## Done when

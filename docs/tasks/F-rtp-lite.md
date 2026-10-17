@@ -173,12 +173,12 @@ Put it in `core/src/main/` so the desktop program can use it too. A command-line
 
 | Task | What changes |
 |------|--------------|
-| A (networking) | `AudioFrame` gains `startOfTransmission` in A-1. `Session.sendAudio(pcm, startOfTransmission)` and `Listener.onPeerAudio(sequence, startOfTransmission, pcm)` pass it through. |
+| A (networking) | `AudioFrame` gains `startOfTransmission` in A-1. `Session.sendAudio(pcm, startOfTransmission)` and `Listener.onPeerAudio(peerId, sequence, startOfTransmission, pcm)` pass it through. |
 | B (desktop audio) | No longer builds `JitterBuffer` or `AudioPlayback`; uses this task's classes instead. Sends the first frame of each press with the flag. Drives the "they're talking" light from `onTalkingChanged`. Until this task lands, B can test with a stand-in that plays frames as they arrive. |
 | C (Android) | Reuses `PlayoutBuffer` and `AudioPlayback` from `core` unchanged. |
 | E (network testing) | Can record `PlayoutStats` on campus to tune the defaults. |
 
-The overview's shared contracts and the A and B documents need updating to match this task. That isn't done yet.
+Task G (group calls) comes after this one. It creates one `PlayoutBuffer` per sender and mixes them with an `AudioMixer` that replaces `AudioPlayback`. `PlayoutBuffer` itself shouldn't need to change.
 
 ## Order of work
 
