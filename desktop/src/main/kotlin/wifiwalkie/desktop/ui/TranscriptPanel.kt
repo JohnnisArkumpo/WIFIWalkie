@@ -40,4 +40,9 @@ class TranscriptPanel(title: String) : JPanel(BorderLayout(6, 6)) {
             transcript.caretPosition = transcript.document.length
         }
     }
+
+    fun clear() {
+        savedText = ""
+        transcript.text = ""
+    }
 }

@@ -12,8 +12,8 @@ import javax.swing.JPanel
 import javax.swing.SwingUtilities
 import javax.swing.Timer
 import javax.swing.WindowConstants
+import wifiwalkie.core.MorseDecoder
 import wifiwalkie.core.Session
-import wifiwalkie.core.morse.MorseDecoder
 import wifiwalkie.desktop.ui.MorseGuide
 import wifiwalkie.desktop.ui.MorseSignalButton
 import wifiwalkie.desktop.ui.PressDurationGauge
@@ -29,6 +29,7 @@ class SignalWindow(title: String) : Session.Listener {
 
     private val frame = JFrame(title)
     private val status = JLabel()
+    private val peerDecodedLine = JLabel("Peer decoded: ")
     private val localButton = MorseSignalButton("HOLD TO SEND", "SENDING…")
     private val peerButton = MorseSignalButton("WAITING FOR PEER", "PEER SENDING…")
     private val pressGauge = PressDurationGauge()
@@ -42,6 +43,7 @@ class SignalWindow(title: String) : Session.Listener {
     private var peerSending = false
     private var pressedAtNanos: Long? = null
     private var lastPressDurationMs = 0L
+    private val peerDecodedText = StringBuilder()
 
     init {
         status.border = BorderFactory.createEmptyBorder(6, 10, 6, 10)
@@ -72,9 +74,13 @@ class SignalWindow(title: String) : Session.Listener {
         }
 
         frame.defaultCloseOperation = WindowConstants.EXIT_ON_CLOSE
+        val footer = JPanel(GridLayout(2, 1)).apply {
+            add(peerDecodedLine)
+            add(status)
+        }
         val bottom = JPanel(BorderLayout()).apply {
             add(lower, BorderLayout.CENTER)
-            add(status, BorderLayout.SOUTH)
+            add(footer, BorderLayout.SOUTH)
         }
         frame.add(signalControls, BorderLayout.CENTER)
         frame.add(bottom, BorderLayout.SOUTH)
@@ -93,14 +99,16 @@ class SignalWindow(title: String) : Session.Listener {
                 if (event.button == MouseEvent.BUTTON1) setLocalSignal(false)
             }
         })
-        Timer(30) {
+        Timer(50) {
+            val nowMs = System.nanoTime() / 1_000_000
             val pressStart = pressedAtNanos
             val elapsed = if (sending && pressStart != null) {
                 (System.nanoTime() - pressStart) / 1_000_000
             } else lastPressDurationMs
             pressGauge.setElapsed(elapsed)
-            sentTranscript.append(sentDecoder.update(sending))
-            receivedTranscript.append(receivedDecoder.update(peerSending))
+            sentTranscript.append(sentDecoder.poll(nowMs))
+            appendPeerText(receivedDecoder.poll(nowMs))
+            updatePeerDecodedLine()
         }.start()
         updateStatus()
     }
@@ -113,6 +121,15 @@ class SignalWindow(title: String) : Session.Listener {
         println(if (connected) "Peer connected." else "Peer lost: nothing received for ${Session.TIMEOUT_MS} ms.")
         SwingUtilities.invokeLater {
             peerConnected = connected
+            if (!connected) {
+                val nowMs = System.nanoTime() / 1_000_000
+                peerDecoderReset(nowMs)
+                peerDecodedText.setLength(0)
+                receivedTranscript.clear()
+                peerButton.setSignalActive(false)
+                peerSending = false
+                updatePeerDecodedLine()
+            }
             updateStatus()
         }
     }
@@ -120,8 +137,11 @@ class SignalWindow(title: String) : Session.Listener {
     override fun onPeerSignalChanged(on: Boolean) {
         SwingUtilities.invokeLater {
             peerSending = on
+            val nowMs = System.nanoTime() / 1_000_000
+            receivedDecoder.onSignal(on, nowMs)
             peerButton.setSignalActive(on)
-            receivedTranscript.append(receivedDecoder.update(on))
+            appendPeerText(receivedDecoder.poll(nowMs))
+            updatePeerDecodedLine()
         }
     }
 
@@ -137,7 +157,9 @@ class SignalWindow(title: String) : Session.Listener {
             pressedAtNanos = null
         }
         localButton.setSignalActive(down)
-        sentTranscript.append(sentDecoder.update(down))
+        val nowMs = System.nanoTime() / 1_000_000
+        sentDecoder.onSignal(down, nowMs)
+        sentTranscript.append(sentDecoder.poll(nowMs))
         updateStatus()
         onLocalSignal(down)
     }
@@ -146,5 +168,21 @@ class SignalWindow(title: String) : Session.Listener {
         val peer = if (peerConnected) "connected" else "waiting for the other computer…"
         val you = if (sending) "SENDING · hold for a dot or dash" else "hold the button or SPACE to send"
         status.text = "Peer: $peer    |    You: $you"
+    }
+
+    private fun appendPeerText(text: String) {
+        peerDecodedText.append(text)
+        if (peerDecodedText.length > 40) peerDecodedText.delete(0, peerDecodedText.length - 40)
+        receivedTranscript.append(text)
+    }
+
+    private fun updatePeerDecodedLine() {
+        val decoded = peerDecodedText.toString().takeLast(40)
+        val pattern = receivedDecoder.currentPattern
+        peerDecodedLine.text = "Peer decoded: $decoded${if (pattern.isNotEmpty()) " $pattern" else ""}"
+    }
+
+    private fun peerDecoderReset(nowMs: Long) {
+        receivedDecoder.reset(nowMs)
     }
 }

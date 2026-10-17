@@ -22,7 +22,8 @@ class MorseGuide : JPanel(BorderLayout(0, 6)) {
             arrayOf("M  --", "N  -.", "O  ---", "P  .--.", "Q  --.-", "R  .-."),
             arrayOf("S  ...", "T  -", "U  ..-", "V  ...-", "W  .--", "X  -..-"),
             arrayOf("Y  -.--", "Z  --..", "0  -----", "1  .----", "2  ..---", "3  ...--"),
-            arrayOf("4  ....-", "5  .....", "6  -....", "7  --...", "8  ---..", "9  ----.")
+            arrayOf("4  ....-", "5  .....", "6  -....", "7  --...", "8  ---..", "9  ----."),
+            arrayOf(".  .-.-.-", ",  --..--", "?  ..--..", "/  -..-.", "=  -...-", "-  -....-")
         )
         val model = object : DefaultTableModel(rows, arrayOf("", "", "", "", "", "")) {
             override fun isCellEditable(row: Int, column: Int) = false

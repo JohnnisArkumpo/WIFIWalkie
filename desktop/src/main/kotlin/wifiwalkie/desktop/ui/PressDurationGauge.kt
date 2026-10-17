@@ -17,7 +17,7 @@ class PressDurationGauge : JComponent() {
         preferredSize = Dimension(190, 180)
         minimumSize = Dimension(170, 150)
         border = BorderFactory.createTitledBorder("Press length")
-        toolTipText = "Aim for 180 ms for a dot or 540 ms for a dash"
+        toolTipText = "At 10 WPM, aim for 120 ms for a dot or 360 ms for a dash"
     }
 
     fun setElapsed(milliseconds: Long) {
@@ -43,8 +43,8 @@ class PressDurationGauge : JComponent() {
         g.fillRoundRect(trackX, bottom - fillHeight, trackWidth, fillHeight, 8, 8)
 
         g.font = font.deriveFont(Font.PLAIN, 12f)
-        drawMark(g, "DOT  180 ms", PressDurationGauge.DOT_TARGET_MS, top, bottom, maxMs, trackX)
-        drawMark(g, "DASH  540 ms", PressDurationGauge.DASH_TARGET_MS, top, bottom, maxMs, trackX)
+        drawMark(g, "DOT  120 ms", PressDurationGauge.DOT_TARGET_MS, top, bottom, maxMs, trackX)
+        drawMark(g, "DASH  360 ms", PressDurationGauge.DASH_TARGET_MS, top, bottom, maxMs, trackX)
 
         g.color = Color(35, 48, 65)
         g.font = font.deriveFont(Font.BOLD, 15f)
@@ -61,8 +61,8 @@ class PressDurationGauge : JComponent() {
     }
 
     companion object {
-        const val DOT_TARGET_MS = 180L
-        const val DASH_TARGET_MS = 540L
-        const val DASH_THRESHOLD_MS = 360L
+        const val DOT_TARGET_MS = 120L
+        const val DASH_TARGET_MS = 360L
+        const val DASH_THRESHOLD_MS = 240L
     }
 }
