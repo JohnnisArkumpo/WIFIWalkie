@@ -1,6 +1,6 @@
 # Task B: Desktop Audio
 
-**Assigned to:** ______________
+**Assigned to:** John
 **Branch:** `b-desktop-audio`
 **Read first:** [00-overview.md](00-overview.md) (shared contracts), [DESIGN.md](../../DESIGN.md)
 
