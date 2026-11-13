@@ -48,7 +48,7 @@ Only touch `core/build.gradle.kts` in this PR.
   - Add `google()` to `dependencyResolutionManagement`.
 - **Android Gradle Plugin:** use the latest stable version that supports our Gradle (9.8). Check Android's compatibility table rather than guessing.
 - **Package:** `wifiwalkie.android`
-- **Android versions:** `minSdk = 26` (Android 8.0), with `compileSdk` and `targetSdk` set to the latest stable version.
+- **Android versions:** `minSdk = 33` (Android 13, the minimum this project supports), with `compileSdk` and `targetSdk` set to 36.
 - **UI:** Jetpack Compose.
 - **Opening it:** open the **repo root folder** in Android Studio, not the `android` folder.
 - **Keep the desktop build working:** `./gradlew :desktop:run` and `./gradlew test` must still work, and a teammate without Android Studio must still be able to build the desktop app. If the Android SDK being required for every build becomes a problem, raise it with the team.

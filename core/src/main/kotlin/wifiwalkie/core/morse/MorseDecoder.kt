@@ -16,7 +16,7 @@ class MorseDecoder(private val unitMs: Long = DEFAULT_UNIT_MS) {
         if (signalOn != on) {
             val duration = (nowMs - changedAt).coerceAtLeast(0)
             if (on) {
-                pattern.append(if (duration < unitMs * 2) '.' else '-')
+                pattern.append(if (duration < unitMs * DASH_THRESHOLD_UNITS) '.' else '-')
                 lastMarkAt = nowMs
                 letterEmitted = false
                 wordEmitted = false
@@ -58,6 +58,8 @@ class MorseDecoder(private val unitMs: Long = DEFAULT_UNIT_MS) {
 
     companion object {
         const val DEFAULT_UNIT_MS = 180L
+        /** A press this many units or longer is a dash; anything shorter is a dot. */
+        const val DASH_THRESHOLD_UNITS = 2
         private val MORSE = mapOf(
             ".-" to 'A', "-..." to 'B', "-.-." to 'C', "-.." to 'D', "." to 'E', "..-." to 'F',
             "--." to 'G', "...." to 'H', ".." to 'I', ".---" to 'J', "-.-" to 'K', ".-.." to 'L',

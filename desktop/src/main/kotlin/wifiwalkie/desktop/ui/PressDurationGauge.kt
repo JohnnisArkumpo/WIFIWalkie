@@ -8,8 +8,9 @@ import java.awt.Graphics2D
 import java.awt.RenderingHints
 import javax.swing.BorderFactory
 import javax.swing.JComponent
+import wifiwalkie.core.morse.MorseDecoder
 
-/** Live press duration with one-unit dot and three-unit dash target marks. */
+/** Live press duration, with one line at the decoder's dot/dash cutoff. */
 class PressDurationGauge : JComponent() {
     private var elapsedMs = 0L
 
@@ -17,7 +18,7 @@ class PressDurationGauge : JComponent() {
         preferredSize = Dimension(190, 180)
         minimumSize = Dimension(170, 150)
         border = BorderFactory.createTitledBorder("Press length")
-        toolTipText = "Aim for 180 ms for a dot or 540 ms for a dash"
+        toolTipText = "Release below the line ($DASH_THRESHOLD_MS ms) for a dot, above it for a dash"
     }
 
     fun setElapsed(milliseconds: Long) {
@@ -39,12 +40,20 @@ class PressDurationGauge : JComponent() {
 
         g.color = Color(232, 237, 244)
         g.fillRoundRect(trackX, top, trackWidth, usableHeight, 8, 8)
-        g.color = if (elapsedMs < PressDurationGauge.DASH_THRESHOLD_MS) Color(63, 137, 202) else Color(224, 148, 52)
+        g.color = if (elapsedMs < DASH_THRESHOLD_MS) Color(63, 137, 202) else Color(224, 148, 52)
         g.fillRoundRect(trackX, bottom - fillHeight, trackWidth, fillHeight, 8, 8)
 
+        // The one cutoff: release below the line for a dot, above it for a dash.
+        val lineY = bottom - (DASH_THRESHOLD_MS * usableHeight / maxMs).toInt()
+        g.color = Color(83, 96, 112)
+        g.drawLine(trackX - 5, lineY, trackX + 16, lineY)
         g.font = font.deriveFont(Font.PLAIN, 12f)
-        drawMark(g, "DOT  180 ms", PressDurationGauge.DOT_TARGET_MS, top, bottom, maxMs, trackX)
-        drawMark(g, "DASH  540 ms", PressDurationGauge.DASH_TARGET_MS, top, bottom, maxMs, trackX)
+        g.color = Color(224, 148, 52).darker()
+        g.drawString("▲ DASH", 10, lineY - 6)
+        g.color = Color(63, 137, 202).darker()
+        g.drawString("▼ DOT", 10, lineY + 16)
+        g.color = Color(83, 96, 112)
+        g.drawString("$DASH_THRESHOLD_MS ms", 70, lineY + 4)
 
         g.color = Color(35, 48, 65)
         g.font = font.deriveFont(Font.BOLD, 15f)
@@ -53,16 +62,8 @@ class PressDurationGauge : JComponent() {
         g.dispose()
     }
 
-    private fun drawMark(g: Graphics2D, label: String, milliseconds: Long, top: Int, bottom: Int, maxMs: Long, trackX: Int) {
-        val y = bottom - (milliseconds * (bottom - top) / maxMs).toInt()
-        g.color = Color(83, 96, 112)
-        g.drawLine(trackX - 5, y, trackX + 16, y)
-        g.drawString(label, 10, y + 4)
-    }
-
     companion object {
-        const val DOT_TARGET_MS = 180L
-        const val DASH_TARGET_MS = 540L
-        const val DASH_THRESHOLD_MS = 360L
+        /** Taken from the decoder, so the line always matches how presses are decoded. */
+        const val DASH_THRESHOLD_MS = MorseDecoder.DEFAULT_UNIT_MS * MorseDecoder.DASH_THRESHOLD_UNITS
     }
 }

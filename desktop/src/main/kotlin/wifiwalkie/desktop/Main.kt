@@ -6,6 +6,7 @@ import java.net.InetAddress
 import java.net.UnknownHostException
 import javax.swing.SwingUtilities
 import kotlin.system.exitProcess
+import wifiwalkie.core.PushToTalk
 import wifiwalkie.core.Session
 import wifiwalkie.core.TcpTransport
 import wifiwalkie.core.UdpTransport
@@ -35,7 +36,7 @@ fun main(args: Array<String>) {
     }
     if (GraphicsEnvironment.isHeadless()) fail("This program needs a desktop to open its window.")
 
-    println("Wi-fi Walkie: Morse test")
+    println("Wi-fi Walkie")
     println("Network:  ${NetworkInfo.networkName() ?: "unknown"}")
     println("Local IP: ${NetworkInfo.localIp() ?: "unknown"}")
     val all = NetworkInfo.allIpv4()
@@ -53,14 +54,37 @@ fun main(args: Array<String>) {
 
     println()
     println("Sending to ${peer.hostAddress}:$peerPort over ${transport.name}, listening on port $port.")
-    println("Click the window and hold SPACE. Close the window or press Ctrl+C to stop.")
+    println("Click the window, then hold SPACE to talk or M for Morse. Close the window or press Ctrl+C to stop.")
 
     SwingUtilities.invokeLater {
         val window = SignalWindow("Wi-fi Walkie: ${transport.name} to ${peer.hostAddress}")
-        val session = Session(transport, window)
+        val audio = DesktopAudio(onPeerTalking = window::setPeerTalking)
+        val session = Session(transport, BothListeners(window, audio))
+        val talk = audio.microphone?.let { PushToTalk(it, session::sendAudio) }
+        window.setMicAvailable(talk != null)
         window.onLocalSignal = session::setLocalSignal
+        window.onTalk = { talk?.setTalking(it) }
         window.show()
+        audio.start()
         session.start()
+    }
+}
+
+/** Passes every [Session] event to both the window and the audio. */
+private class BothListeners(private val first: Session.Listener, private val second: Session.Listener) : Session.Listener {
+    override fun onPeerConnectedChanged(peerId: Int, connected: Boolean) {
+        first.onPeerConnectedChanged(peerId, connected)
+        second.onPeerConnectedChanged(peerId, connected)
+    }
+
+    override fun onPeerSignalChanged(peerId: Int, on: Boolean) {
+        first.onPeerSignalChanged(peerId, on)
+        second.onPeerSignalChanged(peerId, on)
+    }
+
+    override fun onPeerAudio(peerId: Int, sequence: Int, startOfTransmission: Boolean, pcm: ByteArray) {
+        first.onPeerAudio(peerId, sequence, startOfTransmission, pcm)
+        second.onPeerAudio(peerId, sequence, startOfTransmission, pcm)
     }
 }
 

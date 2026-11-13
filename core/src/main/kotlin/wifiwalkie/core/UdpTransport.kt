@@ -21,15 +21,16 @@ class UdpTransport(
 
     private val socket = DatagramSocket(localPort)
 
-    override fun start(onMessage: (SignalMessage) -> Unit) {
+    override fun start(onMessage: (Message) -> Unit) {
         thread(name = "udp-receive", isDaemon = true) {
-            val buffer = ByteArray(64)
+            // One byte bigger than the largest message, so an oversized packet shows up as too long and is rejected.
+            val buffer = ByteArray(Message.MAX_SIZE + 1)
             val packet = DatagramPacket(buffer, buffer.size)
             while (!socket.isClosed) {
                 try {
                     packet.length = buffer.size
                     socket.receive(packet)
-                    SignalMessage.decode(buffer, packet.length)?.let(onMessage)
+                    Message.decode(buffer, packet.length)?.let(onMessage)
                 } catch (e: IOException) {
                     if (!socket.isClosed) System.err.println("UDP receive failed: ${e.message}")
                 }
@@ -37,7 +38,7 @@ class UdpTransport(
         }
     }
 
-    override fun send(message: SignalMessage) {
+    override fun send(message: Message) {
         val bytes = message.encode()
         try {
             socket.send(DatagramPacket(bytes, bytes.size, peer, peerPort))

@@ -19,8 +19,8 @@ Gradle 9
 
 See [DESIGN.md](DESIGN.md) for the full design.
 
-## Running the Morse Test
-A desktop program that links two computers on the same network. Holding the space bar on one turns the other's window white.
+## Running the Desktop Program
+A desktop program that links two computers on the same network. Hold space to talk (push-to-talk), or hold M (or the button) to send a Morse signal, which turns the other window white and decodes into letters.
 
 You only need Java 17 or newer installed. The first run downloads JDK 25 and Kotlin automatically, so it takes a few minutes.
 
@@ -31,7 +31,9 @@ You only need Java 17 or newer installed. The first run downloads JDK 25 and Kot
 
 1. The program prints this computer's network name and IP.
 2. Enter the other computer's IP, then choose TCP or UDP. Both computers must choose the same one.
-3. Click the window and hold space. Close the window or press Ctrl+C to stop.
+3. Click the window, then hold space to talk or M for Morse. Close the window or press Ctrl+C to stop.
+
+**Use headphones** when both computers are in the same room, or one computer's speaker feeds back into the other's microphone. A computer without a microphone or speaker still runs: it prints a warning, and Morse still works.
 
 Both computers use port 5000. If they can't connect:
 * Make sure your firewall allows port 5000 for both TCP and UDP. Windows will ask the first time.
@@ -45,6 +47,19 @@ To try it on one computer, run two copies with swapped ports and enter `127.0.0.
 ```
 
 To run the tests: `./gradlew test`
+
+## Running on Android
+The Android app needs Android 13 or newer. It connects to the desktop program (or another phone) the same way: same Wi-Fi, port 5000, and both sides choosing the same protocol. Hold the green button to talk (it asks for the microphone the first time), or the blue button for Morse. The other side's voice plays through the loudspeaker, and the screen turns white and the phone vibrates while they send Morse.
+
+Building it needs the Android SDK (installed with Android Studio). Gradle finds it through `sdk.dir` in `local.properties` or the `ANDROID_HOME` variable. Without it, the build skips the app and still builds the desktop program.
+
+To install on a phone plugged in by USB with USB debugging on:
+
+```
+./gradlew :android:installDebug
+```
+
+Open **Wi-fi Walkie** on the phone, enter the other device's IP, and tap Connect. The emulator can't receive connections from other computers, so use a real phone.
 
 ## Software Features
 

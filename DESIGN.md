@@ -26,38 +26,35 @@ Stretch goals, in no fixed order: half-duplex mode, screen-off mode using the vo
 
 **Where to test.** Campus Wi-Fi often blocks devices from connecting to each other, even on the same network (this is called client isolation). For milestone 1, use a home network, a phone hotspot, or Ethernet. Both computers' firewalls must allow port 5000. To develop on one computer, run two copies with swapped ports and enter `127.0.0.1` (see the README).
 
-## Message format (milestone 1, built)
+## Message format (built)
 
-There's only one kind of message, and it carries the sender's *full current state* ("my key is down") rather than an event ("I pressed"). Each computer sends its state when it changes and again every 100 ms. That gives three guarantees, over UDP as well as TCP:
+Every message is a `Message` (`core/.../Message.kt`). It starts with the magic byte `W`, so stray packets are ignored, then a type byte, then that type's fields in order. Ints are 4 bytes, big-endian. Every type carries the sender's **session ID**, a random number picked when the program starts, which tells a restarted program apart from late packets. No message is larger than 1400 bytes, so each fits in one UDP packet.
 
-- **A lost message is corrected within 100 ms** by the next one, so the light can't get stuck on.
-- **The repeats act as a heartbeat.** If nothing arrives for 1 s, the peer counts as disconnected and its light turns off.
-- **Old packets are ignored.** A sequence number lets the receiver drop late or out-of-order packets. A random session ID tells a restarted program apart from late packets.
+| Type | Byte | Fields after the type byte | When it's sent |
+|------|------|----------------------------|----------------|
+| `Hello` | `H` | protocol version, session ID, passkey (1 length byte + up to 64 UTF-8 bytes) | Handshake and heartbeat (not used yet; see Task A) |
+| `Signal` | `S` | session ID, sequence, on (1 byte: 0 or 1) | When the key changes, and every 100 ms |
+| `AudioFrame` | `A` | session ID, sequence, flags (1 byte), audio | Every 20 ms while talking |
+| `Bye` | `B` | session ID | Clean disconnect (not used yet; see Task A) |
 
-| Byte(s) | Field |
-|---------|-------|
-| 0 | Magic byte `W`, so stray packets are ignored |
-| 1 | 1 = key down, 0 = key up |
-| 2–5 | Session ID (random per run) |
-| 6–9 | Sequence number |
+In `AudioFrame`, bit 0 of the flags byte is set on the first frame of each push-to-talk press. The other bits are reserved: they're written as 0 and ignored when read. The audio fills the rest of the message.
 
-## Message protocol (milestone 2 and later, planned)
+**`Signal` carries the sender's *full current state*** ("my key is down") rather than an event ("I pressed"). That gives three guarantees, over UDP as well as TCP:
 
-Later milestones add more message types. Each message will start with a 1-byte type, followed by any data that type carries.
+- **A lost signal is corrected within 100 ms** by the next one, so the light can't get stuck on.
+- **The repeats act as a heartbeat.** Any valid message proves the peer is alive. If nothing arrives for 1 s, the peer counts as disconnected and its light turns off.
+- **Old signals are ignored.** Signals and audio each have their own sequence number, so the receiver can drop late or out-of-order packets.
 
-| Type | Data | When it's sent |
-|------|------|----------------|
-| `HELLO` | protocol version, passkey | First message from each side. The connection closes if the passkey doesn't match. |
-| `SIGNAL` | on/off, session ID, sequence | The milestone 1 message above |
-| `BYE` | none | Clean disconnect, so the other side doesn't wait for the timeout |
-| `AUDIO_FRAME` | sequence, length, bytes | Milestone 3 |
+**On the wire:** UDP sends one message per packet. TCP sends a 2-byte length before each message.
+
+`decode` returns `null`, never throws, for anything that isn't exactly one valid message.
 
 ## Classes
 
 ```
   Computer A                                          Computer B
 
-  SpaceBarInput                                       SignalWindow
+  KeyHoldInput                                        SignalWindow
        │ press / release                                   ▲ on / off
        ▼                                                   │
     Session ──────▶ ConnectionManager ═ TCP/UDP ═ ConnectionManager ──────▶ Session
@@ -65,22 +62,27 @@ Later milestones add more message types. Each message will start with a 1-byte t
 
 Everything is symmetric: B's input reaches A's window along the same path in reverse.
 
-The milestone 1 test program builds a simpler version of this: `SignalMessage`, `Session`, `SpaceBarInput` and `SignalWindow` as described here, with `TcpTransport` and `UdpTransport` filling the role of `ConnectionManager` (both implement a `Transport` interface). The list below is the full design for later milestones.
+The milestone 1 test program builds a simpler version of this: `Message`, `Session`, `KeyHoldInput` and `SignalWindow` as described here, with `TcpTransport` and `UdpTransport` filling the role of `ConnectionManager` (both implement a `Transport` interface). The list below is the full design for later milestones.
 
 ### Core (shared by desktop and Android, no UI code)
 
-- **`Message`**: a sealed class with one subclass per message type, plus `writeTo(stream)` and `readFrom(stream)`.
+- **`Message`**: a sealed class with one subclass per message type, plus `encode()` and `Message.decode(bytes)`.
 - **`ConnectionManager`**: wraps a TCP or UDP `Transport`. It adds the `HELLO` and passkey check and the clean `BYE`, and it reports `onConnected`, `onMessage` and `onDisconnected(reason)` to a listener.
 - **`Session`**: connects input, the connection and output. It tracks state (idle, connecting, connected) and whether each side is currently transmitting. It sends local presses out, and it routes each incoming message to the right output. Half-duplex rules will go here later.
-- **`SignalInput`** (interface): reports press and release events. Desktop uses `SpaceBarInput`. Android will use a button or the volume keys.
+- **`SignalInput`** (interface): reports press and release events. Desktop uses `KeyHoldInput`. Android will use a button or the volume keys.
 - **`SignalOutput`** (interface): `setOn(Boolean)`. Desktop uses `SignalWindow`. Android will use vibration or a screen flash.
 - **`MorseDecoder`** (milestone 2, optional): turns on/off timings into dots and dashes, then into letters.
 
-### Audio (milestone 3)
+### Audio (built in a simple first version)
 
-- **`AudioCapture`**: starts and stops the microphone, and produces audio frames for `Session` to send.
-- **`AudioPlayer`**: plays received frames. It keeps a small buffer so uneven network timing doesn't cause choppy playback.
-- **`Beeper`**: the transmission beeps, played when you start or stop talking and when the other person does.
+The audio format everywhere is 16 kHz, mono, 16-bit PCM, in 20 ms frames of 640 bytes (`AudioSpec`). Everything except the actual microphone and speaker lives in `core`, so Android reuses it, and the windows only forward keys and show state.
+
+- **`AudioInput` / `AudioOutput`** (core): the microphone and speaker interfaces. Desktop implements them with Java Sound (`JavaSoundInput`, `JavaSoundOutput`); Android will use `AudioRecord` and `AudioTrack`.
+- **`PushToTalk`** (core): starts and stops the microphone and sends each frame with `Session.sendAudio`, flagging the first frame of each press.
+- **`PlayoutBuffer`** (core): smooths out uneven network timing. Each transmission waits 200 ms before playing, then plays frames in sequence order; duplicates and frames whose turn has passed are dropped, and a missing frame plays as silence. If more than 400 ms piles up after a stall, it skips ahead. It also drives the "they're talking" light from what's actually playing. This is the fixed-delay version; Task F (RTP Lite) replaces its inside with an adaptive delay without changing its methods.
+- **`AudioPlayback`** (core): a thread that plays the buffer through an `AudioOutput`, one frame every 20 ms.
+- **`DesktopAudio`** (desktop): opens the devices and does all the playback setup in one place, so Task G can swap in a mixer. A missing microphone or speaker turns that half off with a warning.
+- **`Beeper`** (planned): the transmission beeps, played when you start or stop talking and when the other person does.
 
 ## Changes from the original plan
 
@@ -100,8 +102,8 @@ A Gradle project with one module per platform. The `core` module never imports S
 
 ```
 core/       Message, ConnectionManager, Session, SignalInput, SignalOutput, MorseDecoder
-desktop/    Main.kt (reads the command-line arguments), SpaceBarInput, SignalWindow
-android/    added in milestone 4
+desktop/    Main.kt (reads the command-line arguments), KeyHoldInput, JavaSound, DesktopAudio, SignalWindow
+android/    the Android app (Android 13+): MainActivity, WalkieViewModel, Screens, VibrationOutput, AndroidNetworkInfo
 ```
 
 To run milestone 1, use `./gradlew -q --console=plain :desktop:run` (more detail in the README).
