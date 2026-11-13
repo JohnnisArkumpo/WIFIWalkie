@@ -103,7 +103,7 @@ A Gradle project with one module per platform. The `core` module never imports S
 ```
 core/       Message, ConnectionManager, Session, SignalInput, SignalOutput, MorseDecoder
 desktop/    Main.kt (reads the command-line arguments), KeyHoldInput, JavaSound, DesktopAudio, SignalWindow
-android/    added in milestone 4
+android/    the Android app (Android 13+): MainActivity, WalkieViewModel, Screens, VibrationOutput, AndroidNetworkInfo
 ```
 
 To run milestone 1, use `./gradlew -q --console=plain :desktop:run` (more detail in the README).

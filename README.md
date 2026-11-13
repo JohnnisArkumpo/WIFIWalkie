@@ -48,6 +48,19 @@ To try it on one computer, run two copies with swapped ports and enter `127.0.0.
 
 To run the tests: `./gradlew test`
 
+## Running on Android
+The Android app needs Android 13 or newer. It connects to the desktop program (or another phone) the same way: same Wi-Fi, port 5000, and both sides choosing the same protocol. For now it sends and shows the Morse signal: hold the big button to send, and the screen turns white and the phone vibrates while the other side sends.
+
+Building it needs the Android SDK (installed with Android Studio). Gradle finds it through `sdk.dir` in `local.properties` or the `ANDROID_HOME` variable. Without it, the build skips the app and still builds the desktop program.
+
+To install on a phone plugged in by USB with USB debugging on:
+
+```
+./gradlew :android:installDebug
+```
+
+Open **Wi-fi Walkie** on the phone, enter the other device's IP, and tap Connect. The emulator can't receive connections from other computers, so use a real phone.
+
 ## Software Features
 
 * [ ] LAN/CAN connection
