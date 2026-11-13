@@ -19,8 +19,8 @@ Gradle 9
 
 See [DESIGN.md](DESIGN.md) for the full design.
 
-## Running the Morse Test
-A desktop program that links two computers on the same network. Holding the space bar on one turns the other's window white.
+## Running the Desktop Program
+A desktop program that links two computers on the same network. Hold space to talk (push-to-talk), or hold M (or the button) to send a Morse signal, which turns the other window white and decodes into letters.
 
 You only need Java 17 or newer installed. The first run downloads JDK 25 and Kotlin automatically, so it takes a few minutes.
 
@@ -31,7 +31,9 @@ You only need Java 17 or newer installed. The first run downloads JDK 25 and Kot
 
 1. The program prints this computer's network name and IP.
 2. Enter the other computer's IP, then choose TCP or UDP. Both computers must choose the same one.
-3. Click the window and hold space. Close the window or press Ctrl+C to stop.
+3. Click the window, then hold space to talk or M for Morse. Close the window or press Ctrl+C to stop.
+
+**Use headphones** when both computers are in the same room, or one computer's speaker feeds back into the other's microphone. A computer without a microphone or speaker still runs: it prints a warning, and Morse still works.
 
 Both computers use port 5000. If they can't connect:
 * Make sure your firewall allows port 5000 for both TCP and UDP. Windows will ask the first time.

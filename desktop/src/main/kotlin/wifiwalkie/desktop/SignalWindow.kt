@@ -1,8 +1,10 @@
 package wifiwalkie.desktop
 
 import java.awt.BorderLayout
+import java.awt.Color
 import java.awt.Dimension
 import java.awt.GridLayout
+import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.BorderFactory
@@ -24,8 +26,11 @@ import wifiwalkie.desktop.ui.TranscriptPanel
  */
 class SignalWindow(title: String) : Session.Listener {
 
-    /** Called with true when space goes down in this window, false when it comes up. */
+    /** Called with true when the Morse key (M or the button) goes down in this window, false when it comes up. */
     var onLocalSignal: (Boolean) -> Unit = {}
+
+    /** Called with true when space (push-to-talk) goes down in this window, false when it comes up. */
+    var onTalk: (Boolean) -> Unit = {}
 
     private val frame = JFrame(title)
     private val status = JLabel()
@@ -38,6 +43,9 @@ class SignalWindow(title: String) : Session.Listener {
     private val receivedDecoder = MorseDecoder()
 
     private var peerConnected = false
+    private var talking = false
+    private var peerTalking = false
+    private var micAvailable = true
     private var sending = false
     private var peerSending = false
     private var pressedAtNanos: Long? = null
@@ -81,8 +89,13 @@ class SignalWindow(title: String) : Session.Listener {
         frame.pack()
         frame.setLocationRelativeTo(null)
 
-        SpaceBarInput(frame) { down ->
+        KeyHoldInput(frame, KeyEvent.VK_M) { down ->
             setLocalSignal(down)
+        }
+        KeyHoldInput(frame, KeyEvent.VK_SPACE) { down ->
+            talking = down && micAvailable
+            updateStatus()
+            onTalk(down)
         }
         localButton.addMouseListener(object : MouseAdapter() {
             override fun mousePressed(event: MouseEvent) {
@@ -117,6 +130,22 @@ class SignalWindow(title: String) : Session.Listener {
         }
     }
 
+    /** Shows whether the other person's voice is playing. Call from any thread. */
+    fun setPeerTalking(on: Boolean) {
+        SwingUtilities.invokeLater {
+            peerTalking = on
+            updateStatus()
+        }
+    }
+
+    /** Call once at startup if there's no microphone, so push-to-talk shows as unavailable. */
+    fun setMicAvailable(available: Boolean) {
+        SwingUtilities.invokeLater {
+            micAvailable = available
+            updateStatus()
+        }
+    }
+
     override fun onPeerSignalChanged(peerId: Int, on: Boolean) {
         SwingUtilities.invokeLater {
             peerSending = on
@@ -143,8 +172,25 @@ class SignalWindow(title: String) : Session.Listener {
     }
 
     private fun updateStatus() {
-        val peer = if (peerConnected) "connected" else "waiting for the other computer…"
-        val you = if (sending) "SENDING · hold for a dot or dash" else "hold the button or SPACE to send"
-        status.text = "Peer: $peer    |    You: $you"
+        val peer = when {
+            !peerConnected -> "waiting for the other computer…"
+            peerTalking -> "connected · TALKING"
+            else -> "connected"
+        }
+        val voice = when {
+            !micAvailable -> "no microphone"
+            talking -> "TALKING"
+            else -> "hold SPACE to talk"
+        }
+        val morse = if (sending) "SENDING · hold for a dot or dash" else "hold M or the button for Morse"
+        status.text = "Peer: $peer    |    You: $voice · $morse"
+        // A green status line while the other person's voice is playing.
+        status.isOpaque = peerTalking
+        status.background = PEER_TALKING_COLOR
+        status.repaint()
+    }
+
+    private companion object {
+        val PEER_TALKING_COLOR = Color(0xA5D6A7)
     }
 }
