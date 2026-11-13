@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Reading this phone's IP address to show on the Connect screen. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Push-to-talk. Asked for the first time the Talk button is held. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Vibrating while the other person sends the Morse signal. -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
