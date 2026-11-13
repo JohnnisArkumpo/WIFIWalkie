@@ -6,37 +6,53 @@ import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 
 /**
- * Sends this computer's on/off signal to the peer and tracks the peer's signal.
+ * Sends this computer's on/off signal and audio to the peer, and tracks the peer.
  *
- * The local state is sent whenever it changes and again every [HEARTBEAT_MS].
- * The repeats act as a heartbeat: if nothing arrives from the peer for
+ * The local signal is sent whenever it changes and again every [HEARTBEAT_MS].
+ * The repeats act as a heartbeat: if nothing at all arrives from the peer for
  * [TIMEOUT_MS], the peer counts as disconnected and its signal is turned off.
+ *
+ * [sessionId] identifies this run of the program in every message it sends.
  */
-class Session(private val transport: Transport, private val listener: Listener) : Closeable {
+class Session(
+    private val transport: Transport,
+    private val listener: Listener,
+    val sessionId: Int = Random.nextInt(),
+) : Closeable {
 
-    /** Called on a background thread. Implementations must return quickly. */
+    /**
+     * Called on a background thread. Implementations must return quickly.
+     *
+     * `peerId` is the peer's session ID. With one peer it's always the same until
+     * the peer restarts; it's there so group calls can tell senders apart.
+     */
     interface Listener {
-        fun onPeerConnectedChanged(connected: Boolean)
-        fun onPeerSignalChanged(on: Boolean)
+        fun onPeerConnectedChanged(peerId: Int, connected: Boolean)
+        fun onPeerSignalChanged(peerId: Int, on: Boolean)
+
+        /** One frame of the peer's audio, in the order it arrived (which may not be [sequence] order). */
+        fun onPeerAudio(peerId: Int, sequence: Int, startOfTransmission: Boolean, pcm: ByteArray) {}
     }
 
-    // Lets the peer tell a restarted copy of this program apart from late packets.
-    private val sessionId = Random.nextInt()
-
-    // All sending and timeout checks run on this one thread, so `sequence` needs no lock.
+    // All sending and timeout checks run on this one thread, so the sequence counters need no lock.
     private val worker = Executors.newSingleThreadScheduledExecutor { task ->
         Thread(task, "session").apply { isDaemon = true }
     }
-    private var sequence = 0
+    private var signalSequence = 0
+    private var audioSequence = 0
 
     @Volatile private var localOn = false
 
-    // Peer state, guarded by `this`.
-    private var peerConnected = false
-    private var peerOn = false
-    private var peerSessionId: Int? = null
-    private var peerSequence = 0
-    private var lastHeardNanos = 0L
+    /** Everything known about the peer. Task G turns this into a map keyed by session ID. */
+    private class PeerState(val sessionId: Int) {
+        var connected = false
+        var signalOn = false
+        var signalSequence = 0
+        var lastHeardNanos = 0L
+    }
+
+    // Guarded by `this`.
+    private var peer: PeerState? = null
 
     fun start() {
         transport.start(::onMessage)
@@ -47,44 +63,78 @@ class Session(private val transport: Transport, private val listener: Listener) 
     fun setLocalSignal(on: Boolean) {
         if (on == localOn) return
         localOn = on
-        worker.execute(::sendState)
+        worker.execute(::sendSignal)
     }
 
-    private fun sendState() {
-        sequence++
-        transport.send(SignalMessage(localOn, sessionId, sequence))
+    /**
+     * Sends one frame of audio. Call from any thread. [pcm] is copied, so the
+     * caller may reuse its buffer. Set [startOfTransmission] on the first frame
+     * of each push-to-talk press.
+     */
+    fun sendAudio(pcm: ByteArray, startOfTransmission: Boolean) {
+        val frame = pcm.copyOf()
+        worker.execute {
+            audioSequence++
+            transport.send(Message.AudioFrame(sessionId, audioSequence, startOfTransmission, frame))
+        }
+    }
+
+    private fun sendSignal() {
+        signalSequence++
+        transport.send(Message.Signal(sessionId, signalSequence, localOn))
     }
 
     private fun tick() {
-        sendState()
+        sendSignal()
         synchronized(this) {
-            if (peerConnected && System.nanoTime() - lastHeardNanos > TimeUnit.MILLISECONDS.toNanos(TIMEOUT_MS)) {
-                peerConnected = false
-                listener.onPeerConnectedChanged(false)
-                if (peerOn) {
-                    peerOn = false
-                    listener.onPeerSignalChanged(false)
-                }
+            val current = peer ?: return
+            if (current.connected && System.nanoTime() - current.lastHeardNanos > TimeUnit.MILLISECONDS.toNanos(TIMEOUT_MS)) {
+                disconnect(current)
             }
         }
     }
 
-    private fun onMessage(message: SignalMessage) {
+    private fun onMessage(message: Message) {
         synchronized(this) {
-            // UDP can deliver packets late or out of order. Ignore anything older than what we've already seen.
-            if (message.sessionId == peerSessionId && message.sequence <= peerSequence) return
-            peerSessionId = message.sessionId
-            peerSequence = message.sequence
-            lastHeardNanos = System.nanoTime()
+            var current = peer
+            if (current == null || current.sessionId != message.sessionId) {
+                // A new peer, or the same one restarted. Report the old one gone first, so playback can reset.
+                if (current != null && current.connected) disconnect(current)
+                current = PeerState(message.sessionId)
+                peer = current
+            }
 
-            if (!peerConnected) {
-                peerConnected = true
-                listener.onPeerConnectedChanged(true)
+            // Any valid message proves the peer is alive.
+            current.lastHeardNanos = System.nanoTime()
+            if (!current.connected) {
+                current.connected = true
+                listener.onPeerConnectedChanged(current.sessionId, true)
             }
-            if (message.on != peerOn) {
-                peerOn = message.on
-                listener.onPeerSignalChanged(message.on)
+
+            when (message) {
+                is Message.Signal -> {
+                    // UDP can deliver packets late or out of order. Ignore any signal older than what we've already seen.
+                    if (message.sequence <= current.signalSequence) return
+                    current.signalSequence = message.sequence
+                    if (message.on != current.signalOn) {
+                        current.signalOn = message.on
+                        listener.onPeerSignalChanged(current.sessionId, message.on)
+                    }
+                }
+                is Message.AudioFrame ->
+                    listener.onPeerAudio(current.sessionId, message.sequence, message.startOfTransmission, message.pcm)
+                is Message.Hello, is Message.Bye -> {}
             }
+        }
+    }
+
+    // Call while holding `this`.
+    private fun disconnect(state: PeerState) {
+        state.connected = false
+        listener.onPeerConnectedChanged(state.sessionId, false)
+        if (state.signalOn) {
+            state.signalOn = false
+            listener.onPeerSignalChanged(state.sessionId, false)
         }
     }
 

@@ -109,7 +109,7 @@ class SignalWindow(title: String) : Session.Listener {
         frame.isVisible = true
     }
 
-    override fun onPeerConnectedChanged(connected: Boolean) {
+    override fun onPeerConnectedChanged(peerId: Int, connected: Boolean) {
         println(if (connected) "Peer connected." else "Peer lost: nothing received for ${Session.TIMEOUT_MS} ms.")
         SwingUtilities.invokeLater {
             peerConnected = connected
@@ -117,7 +117,7 @@ class SignalWindow(title: String) : Session.Listener {
         }
     }
 
-    override fun onPeerSignalChanged(on: Boolean) {
+    override fun onPeerSignalChanged(peerId: Int, on: Boolean) {
         SwingUtilities.invokeLater {
             peerSending = on
             peerButton.setSignalActive(on)
